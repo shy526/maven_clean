@@ -1,12 +1,14 @@
 package com.github.shy526;
 
-import java.io.ByteArrayOutputStream;
+import com.sun.deploy.util.StringUtils;
+import sun.rmi.runtime.Log;
+
 import java.io.File;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -41,24 +43,59 @@ public class App {
     }
 
     public static void workProcess(File work) {
-        System.out.println("工作目录--->" + work.getAbsolutePath());
         List<File> fileList = Arrays.asList(work.listFiles());
         deleteLast(fileList, "lastUpdated");
         deleteLast(fileList, "war");
         final List<File> jarList = steamFilter(fileList, "jar").collect(Collectors.toList());
-        if (jarList.size()<=1){
+        if (jarList.size() <= 1) {
             return;
         }
-        jarList.forEach(System.out::println);
+        fileList.stream().filter(item -> "resolver-status.properties".equals(item.getName())).findFirst()
+                .ifPresent(item -> {
+                    Properties properties = new Properties();
+                    try {
+                        properties.load(new FileReader(item));
+                        long lastTime = Long.MIN_VALUE;
+                        for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+                            String str = (String) entry.getValue();
+                            if (str == null || "".equals(str)) {
+                                continue;
+                            }
+                            lastTime = Math.min(lastTime, Long.parseLong(str));
+                        }
+                        for (File file : fileList) {
+                            if (!file.exists()) {
+                                return;
+                            }
+                            BasicFileAttributes attr = null;
+                            attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+                            long updateTime = attr.lastModifiedTime().toMillis();
+                            if (updateTime > lastTime) {
+                                continue;
+                            }
+                            deleteFile(file);
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+
     }
 
     private static void deleteLast(List<File> workList, String last) {
-        steamFilter(workList, last)
-                .forEach(file -> System.out.println("删除---->" + file.getAbsolutePath() + "---->>" + file.delete()));
+        steamFilter(workList, last).forEach(App::deleteFile);
     }
 
     private static Stream<File> steamFilter(List<File> workList, String last) {
         return workList.stream()
                 .filter(file -> last.equals(file.getName().substring(file.getName().lastIndexOf(".") + 1)));
+    }
+
+    private static void deleteFile(File file) {
+        if (!file.exists()) {
+            return;
+        }
+        System.out.println(file.getAbsolutePath() + "---->>" + file.delete());
     }
 }
