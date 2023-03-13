@@ -55,13 +55,13 @@ public class App {
                     Properties properties = new Properties();
                     try {
                         properties.load(new FileReader(item));
-                        long lastTime = Long.MIN_VALUE;
+                        long lastTime = Long.MAX_VALUE;
                         for (Map.Entry<Object, Object> entry : properties.entrySet()) {
                             String str = (String) entry.getValue();
                             if (str == null || "".equals(str)) {
                                 continue;
                             }
-                            lastTime = Math.min(lastTime, Long.parseLong(str));
+                            lastTime = Math.min(Long.parseLong(str), lastTime);
                         }
                         for (File file : fileList) {
                             if (!file.exists()) {
